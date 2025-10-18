@@ -1,0 +1,7 @@
+{
+  "name": "AR QR Code Scanner",
+  "description": "A web application that uses the camera to scan QR codes, displaying a 3D model in AR and playing associated audio. Users can manage their own AR content.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
