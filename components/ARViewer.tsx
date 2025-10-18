@@ -13,10 +13,11 @@ declare global {
         src?: string;
         alt?: string;
         ar?: boolean;
-        'ar-modes'?: string;
-        'camera-controls'?: boolean;
-        'auto-rotate'?: boolean;
-        'ios-src'?: string;
+        // FIX: Use camelCase for properties with hyphens when using custom elements in React.
+        arModes?: string;
+        cameraControls?: boolean;
+        autoRotate?: boolean;
+        iosSrc?: string;
       }, HTMLElement>;
     }
   }
@@ -83,13 +84,14 @@ const ARViewer: React.FC<ARViewerProps> = ({ itemId }) => {
           <h2 className="text-lg font-bold text-white text-center truncate">{item.name}</h2>
         </div>
         <div className="flex-grow w-full h-full min-h-0">
+          {/* FIX: Use camelCase for properties with hyphens when using custom elements in React. */}
           <model-viewer
             src={item.modelDataUrl}
-            ios-src=""
+            iosSrc=""
             ar
-            ar-modes="webxr scene-viewer quick-look"
-            camera-controls
-            auto-rotate
+            arModes="webxr scene-viewer quick-look"
+            cameraControls
+            autoRotate
             alt={`3D model of ${item.name}`}
           ></model-viewer>
         </div>

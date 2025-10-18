@@ -5,6 +5,7 @@ import { PlusIcon, TrashIcon, File3DIcon, MusicIcon, LogoIcon, LogoutIcon, HomeI
 
 declare var QRCode: any;
 
+// Helper นี้ไม่จำเป็นแล้วถ้าไฟล์ถูกจัดการโดย API แต่เก็บไว้สำหรับการแสดงผลชื่อไฟล์
 const fileToDataURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -23,28 +24,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [error, setError] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const modelInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const fetchItems = async () => {
-      setIsLoading(true);
-      const fetchedItems = await api.getContentItems();
-      setItems(fetchedItems);
-      setIsLoading(false);
-    };
-    fetchItems();
+  const fetchItems = useCallback(async () => {
+    setIsLoading(true);
+    const fetchedItems = await api.getContentItems();
+    setItems(fetchedItems);
+    setIsLoading(false);
   }, []);
 
-  const handleAddClick = () => {
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  const handleAddClick = async () => {
     if (!modelFile || !audioFile) {
       setError('กรุณาเลือกทั้งไฟล์โมเดล 3D และไฟล์เสียง');
       return;
     }
     setError('');
+    setIsUploading(true);
 
+    // หมายเหตุ: ในสถาปัตยกรรมที่สมบูรณ์, ID และ QR Code ควรถูกสร้างโดย Backend
+    // แต่เพื่อความเรียบง่าย เรายังคงสร้างที่ Frontend ก่อนส่งไป
     const id = `ar-item-${Date.now()}`;
     const urlToEncode = `${window.location.origin}${window.location.pathname}#/view/${id}`;
 
@@ -53,33 +59,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       if (err) {
         console.error(err);
         setError('เกิดข้อผิดพลาดในการสร้าง QR Code');
+        setIsUploading(false);
         return;
       }
-      try {
-        const qrCodeUrl = canvas.toDataURL();
-        const [modelDataUrl, audioDataUrl] = await Promise.all([
-          fileToDataURL(modelFile),
-          fileToDataURL(audioFile),
-        ]);
+      
+      const qrCodeUrl = canvas.toDataURL();
+      const itemName = modelFile.name.replace(/\.[^/.]+$/, '');
 
-        const newItem: ContentItem = {
-          id,
-          name: modelFile.name.replace(/\.[^/.]+$/, ''),
-          modelDataUrl,
-          audioDataUrl,
-          qrCodeUrl,
-        };
+      // ตอนนี้เรียกใช้ api.addContentItem เวอร์ชันใหม่
+      const newItem = await api.addContentItem(itemName, modelFile, audioFile, qrCodeUrl);
 
-        await api.addContentItem(newItem);
-        setItems(prevItems => [...prevItems, newItem]);
+      setIsUploading(false);
+      if (newItem) {
+        // เมื่อสำเร็จ, ดึงข้อมูลทั้งหมดมาใหม่เพื่อความแน่นอน
+        fetchItems(); 
 
+        // เคลียร์ฟอร์ม
         setModelFile(null);
         setAudioFile(null);
         if (modelInputRef.current) modelInputRef.current.value = '';
         if (audioInputRef.current) audioInputRef.current.value = '';
-      } catch (e) {
-        setError('เกิดข้อผิดพลาดในการแปลงไฟล์');
-        console.error(e);
+      } else {
+        setError('เกิดข้อผิดพลาดในการอัปโหลดไฟล์ไปยังเซิร์ฟเวอร์');
       }
     });
   };
@@ -128,9 +129,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <FileInput label="ไฟล์เสียง (.mp3)" icon={<MusicIcon />} accept=".mp3" file={audioFile} onChange={(e) => setAudioFile(e.target.files ? e.target.files[0] : null)} inputRef={audioInputRef} />
           </div>
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-          <button onClick={handleAddClick} className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 transition-all duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed" disabled={!modelFile || !audioFile}>
-            <PlusIcon />
-            <span className="ml-2">เพิ่มเนื้อหา</span>
+          <button onClick={handleAddClick} className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 transition-all duration-200 disabled:bg-gray-500 disabled:cursor-not-allowed" disabled={!modelFile || !audioFile || isUploading}>
+            {isUploading ? (
+                <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>กำลังอัปโหลด...</span>
+                </>
+            ) : (
+                <>
+                    <PlusIcon />
+                    <span className="ml-2">เพิ่มเนื้อหา</span>
+                </>
+            )}
           </button>
         </div>
         <h2 className="text-xl font-semibold text-white mb-4">คอลเลกชันของคุณ</h2>

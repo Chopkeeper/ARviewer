@@ -1,7 +1,10 @@
 export interface ContentItem {
   id: string;
   name: string;
-  modelDataUrl: string; // From File
-  audioDataUrl: string; // From File
-  qrCodeUrl: string;    // Generated Data URL for the QR code image
+  // URL ที่ชี้ไปยังไฟล์โมเดลที่อยู่บน Server
+  modelDataUrl: string; 
+  // URL ที่ชี้ไปยังไฟล์เสียงที่อยู่บน Server
+  audioDataUrl: string; 
+  // URL ของรูปภาพ QR Code ที่ถูกสร้างและเก็บไว้
+  qrCodeUrl: string;    
 }
